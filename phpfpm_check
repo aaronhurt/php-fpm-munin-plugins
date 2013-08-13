@@ -1,0 +1,80 @@
+#!/usr/bin/env php
+<?php
+/*
+Parameters:
+
+config (required)
+autoconf (optional - used by munin-config)
+
+Magick markers (optional - used by munin-config and some installation scripts):
+%# family=manual
+%# capabilities=autoconf
+*/
+
+/* we only run from the command line */
+if (strcasecmp(PHP_SAPI, 'cli') != 0) {
+    print $argv[0] . ": may only be run from the cli!\n";
+    exit(1);
+}
+
+/* default config */
+$my = array(
+    'url' => getenv('url') ? getenv('url') : 'http://127.0.0.1:80/status?json',
+    'fpmbin' => getenv('fpmbin') ? getenv('fpmbin') : 'php-fpm',
+    'self' => basename($argv[0]),
+);
+
+/* include our defaults */
+require_once('common.php');
+
+/* include specific configs */
+require_once('configs.php');
+
+/* include specific checks */
+require_once('checks.php');
+
+/* check command line arguments */
+if (($argc > 1) && isset($argv[1]) && !empty($argv[1])) {
+    /* see what they want us to do */
+    switch($argv[1]) {
+        case 'autoconf':
+            /* build function name */
+            $func = '_autoconf_' . $my['self'];
+            /* execute specific function if available */
+            if (function_exists($func)) {
+                $func($my);
+            } else {
+                /* execute default autoconf function */
+                _autoconf_default($my);
+            }
+        break;
+        case 'config';
+            /* build function */
+            $func = '_config_' . $my['self'];
+            /* execute specific function if available */
+            if (function_exists($func)) {
+                $func($my);
+            } else {
+                /* we can't go on without this */
+                print "missing config function: $func\n"; exit(1);
+            }
+        break;
+        default:
+            /* exit out */
+            print "invalid argument: " . $argv[1] . "\n"; exit(1);
+        break;
+    }
+}
+
+/* build function string */
+$func = '_check_' . $my['self'];
+
+/* run the plugin if available */
+if (function_exists($func)) {
+    $func($my); exit(0);
+} else {
+    /* we shouldn't get here */
+    print "invalid caller: " . $argv[0] . "\n"; exit(1);
+}
+
+?>
